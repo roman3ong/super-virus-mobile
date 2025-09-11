@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<style>body{margin:0;background:#87CEEB;overflow:hidden}#c{display:block;margin:0 auto;background:linear-gradient(to bottom,#87CEEB,#E0F6FF)}#score{position:fixed;top:10px;left:10px;background:rgba(255,255,255,.8);padding:5px 10px;font:bold 16px Arial}</style>
+<canvas id="c"></canvas>
+<div id="score">得分 0 生命 3</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+function resize(){const w=innerWidth,h=innerHeight,s=Math.min(w/800,h/600);c.width=800*s;c.height=600*s;x.setTransform(s,0,0,s,0,0)}
+resize();onresize=resize;
+const img=new Image();img.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNSIgY3k9IjI1IiByPSIyMCIgZmlsbD0iIzQyODVGNCIvPjx0ZXh0IHg9IjI1IiB5PSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPvCfjrk8L3RleHQ+PC9zdmc+';
+let g={h:{x:100,y:400,w:50,h:50,vy:0,o:0,s:5},v:[],l:[],p:[],S:0,L:3,R:1};
+const plat=[{x:0,y:550,w:800,h:50},{x:200,y:450,w:150,h:20},{x:400,y:350,w:150,h:20},{x:600,y:250,w:150,h:20}];
+function spawn(){if(Math.random()<.02)g.v.push({x:800,y:Math.random()*500,w:40,h:40,sp:2+Math.random()*2,d:Math.random()>.5?1:-1})}
+function shoot(){const t=Date.now();if(t-g.lastShot>600){g.lastShot=t;g.l.push({x:g.h.x+g.h.w,y:g.h.y+g.h.h/2,w:30,h:5,sp:10})}}
+function loop(){
+  if(!g.R)return;
+  // 控制
+  const tx=touchDir||0;h=g.h;h.x+=tx*h.s;h.x=Math.max(0,Math.min(800-h.w,h.x));
+  // 重力
+  h.vy+=.8;h.y+=h.vy;h.o=0;
+  for(let p of plat)if(h.x<p.x+p.w&&h.x+h.w>p.x&&h.y<p.y+p.h&&h.vy>0){h.y=p.y-h.h;h.vy=0;h.o=1}
+  if(h.y>600){g.L--;h.x=100;h.y=400;h.vy=0}
+  shoot();
+  // 更新
+  g.l=g.l.filter(l=>{l.x+=l.sp;return l.x<800});
+  g.v=g.v.filter(v=>{v.x-=v.sp;v.y+=v.d*.5;if(v.y<=0||v.y>=560)v.d*=-1;return v.x>-40});
+  // 碰撞
+  g.l.forEach((l,li)=>g.v.forEach((v,vi)=>{if(l.x<v.x+v.w&&l.x+l.w>v.x&&l.y<v.y+v.h&&l.y+l.h>v.y){g.l.splice(li,1);g.v.splice(vi,1);g.S+=100}}));
+  g.v.forEach((v,vi)=>{if(h.x<v.x+v.w&&h.x+h.w>v.x&&h.y<v.y+v.h&&h.y+h.h>v.y){g.v.splice(vi,1);g.L--;h.x=100;h.y=400}});
+  if(g.L<=0){g.R=0;alert('游戏结束 得分 '+g.S)}
+  spawn();
+  // 画
+  x.clearRect(0,0,800,600);x.fillStyle='#8B4513';plat.forEach(p=>x.fillRect(p.x,p.y,p.w,p.h));
+  x.drawImage(img,h.x,h.y,h.w,h.h);x.fillStyle='#FF5555';g.v.forEach(v=>x.fillRect(v.x,v.y,v.w,v.h));
+  x.fillStyle='#FFD700';g.l.forEach(l=>x.fillRect(l.x,l.y,l.w,l.h));
+  document.getElementById('score').textContent='得分 '+g.S+' 生命 '+g.L;
+  requestAnimationFrame(loop)
+}
+let touchDir=0;
+addEventListener('touchstart',e=>{e.preventDefault();const tx=e.touches[0].clientX;if(tx<innerWidth/2)touchDir=tx<innerWidth/4?-1:1;else if(e.target.id==='jumpBtn'&&h.o){h.vy=-15;h.o=0}});
+addEventListener('touchend',e=>{e.preventDefault();touchDir=0});
+loop();
+</script>
+</html>
