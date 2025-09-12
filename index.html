@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>超人打病毒-手机版</title>
+<style>
+* {box-sizing:border-box;margin:0;padding:0}
+body {background:#87CEEB;font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+#canvas {display:block;margin:0 auto;background:linear-gradient(to bottom,#87CEEB,#E0F6FF)}
+#ui {position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.joy {position:absolute;bottom:20px;width:90px;height:90px;background:rgba(255,255,255,.6);border-radius:50%;pointer-events:auto;display:flex;align-items:center;justify-content:center}
+#joyLeft {left:20px}
+#joyRight {right:20px}
+#jumpBtn {right:20px;bottom:130px;width:70px;height:70px;background:rgba(0,255,255,.8);border-radius:50%;font-size:18px;font-weight:bold;color:#333;pointer-events:auto}
+.upload-bar {position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.85);padding:8px;border-radius:6px;display:flex;gap:8px;pointer-events:auto}
+.upload-bar label {padding:6px 10px;background:#4CAF50;color:#fff;border-radius:4px;font-size:12px;cursor:pointer}
+.score {position:absolute;top:10px;left:10px;background:rgba(255,255,255,.8);padding:6px 10px;border-radius:4px;font-weight:bold}
+.power {position:absolute;top:10px;right:10px;background:rgba(255,255,255,.8);padding:6px 10px;border-radius:4px;font-weight:bold}
+.game-over-popup {position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:20px;border-radius:10px;text-align:center;display:none;pointer-events:auto}
+.game-over-popup button {margin-top:10px;padding:8px 16px;background:#FF6B6B;color:#fff;border:none;border-radius:4px;font-size:16px;cursor:pointer}
+input[type=file] {display:none}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!-- 虚拟摇杆 -->
+<div id="ui">
+  <div class="score">得分 <span id="score">0</span> 生命 <span id="lives">3</span></div>
+  <div class="power">能力 <span id="power">无</span></div>
+  <div class="upload-bar">
+    <label for="upHero">超人</label><input type="file" id="upHero" accept="image/*">
+    <label for="upV1">病毒1</label><input type="file" id="upV1" accept="image/*">
+    <label for="upV2">病毒2</label><input type="file" id="upV2" accept="image/*">
+    <label for="upV3">病毒3</label><input type="file" id="upV3" accept="image/*">
+  </div>
+  <div id="joyLeft" class="joy">◀▶</div>
+  <div id="jumpBtn">跳</div>
+</div>
+
+<div class="game-over-popup" id="overPop">
+  <h2>游戏结束</h2>
+  <p>得分 <span id="finalScore">0</span></p>
+  <button onclick="restartGame()">再来</button>
+</div>
+
+<script>
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+function resize(){const w=window.innerWidth,h=window.innerHeight,s=Math.min(w/800,h/600);canvas.width=800*s;canvas.height=600*s;ctx.setTransform(s,0,0,s,0,0)}
+resize();window.addEventListener('resize',resize);
+
+// 图片资源
+const heroImg=new Image(),virusImgs=[new Image(),new Image(),new Image()];
+heroImg.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNSIgY3k9IjI1IiByPSIyMCIgZmlsbD0iIzQyODVGNCIvPjx0ZXh0IHg9IjI1IiB5PSIzMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMjQiPvCfjrk8L3RleHQ+PC9zdmc+';
+['#FF5555','#9C27B0','#4CAF50'].forEach((c,i)=>virusImgs[i].src=`data:image/svg+xml;base64,${btoa(`<svg width="40" height="40" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="18" fill="${c}"/><text x="20" y="25" text-anchor="middle" fill="white" font-size="20">🦠</text></svg>`)}`);
+
+// 游戏状态
+let GAME={
+  hero:{x:100,y:400,w:50,h:50,vy:0,onG:false,sp:5,power:null,powerT:0,w0:50,h0:50},
+  viruses:[],lasers:[],powerUps:[],
+  score:0,lives:3,running:true,
+  plat:[{x:0,y:550,w:800,h:50},{x:200,y:450,w:150,h:20},{x:400,y:350,w:150,h:20},{x:600,y:250,w:150,h:20}],
+  keys:{left:0,right:0},
+  lastShot:0
+};
+
+// 输入
+const joyLeft=document.getElementById('joyLeft'),jumpBtn=document.getElementById('jumpBtn');
+let touchDir=0;
+joyLeft.addEventListener('touchstart',e=>{e.preventDefault();const x=e.touches[0].clientX-joyLeft.getBoundingClientRect().left;touchDir=x<45?-1:1});
+joyLeft.addEventListener('touchmove',e=>{e.preventDefault();const x=e.touches[0].clientX-joyLeft.getBoundingClientRect().left;touchDir=x<45?-1:1});
+joyLeft.addEventListener('touchend',e=>{e.preventDefault();touchDir=0});
+jumpBtn.addEventListener('touchstart',e=>{e.preventDefault();if(!GAME.hero.onG){return}GAME.hero.vy=-15;GAME.hero.onG=false});
+
+// 文件上传
+['upHero','upV1','upV2','upV3'].forEach((id,i)=>{
+  document.getElementById(id).addEventListener('change',e=>{
+    const file=e.target.files[0];if(!file)return;
+    const url=URL.createObjectURL(file);
+    if(i===0)heroImg.src=url;else virusImgs[i-1].src=url;
+  });
+});
+
+// 激光
+function shoot(){
+  const now=Date.now();
+  if(now-GAME.lastShot<600)return;
+  GAME.lastShot=now;
+  const h=GAME.hero;
+  if(h.power==='9价'&&now-h.powerT<5000){
+    for(let dy of[-20,0,20])GAME.lasers.push({x:h.x+h.w,y:h.y+h.h/2+dy,w:30,h:5,sp:10});
+  }else{
+    GAME.lasers.push({x:h.x+h.w,y:h.y+h.h/2,w:30,h:5,sp:10});
+  }
+}
+
+// 生成
+function spawnVirus(){
+  if(Math.random()<.02&&GAME.viruses.length<8){
+    const t=Math.floor(Math.random()*3);
+    GAME.viruses.push({x:800,y:Math.random()*500,w:40,h:40,sp:2+Math.random()*2,dir:Math.random()>.5?1:-1,t});
+  }
+}
+function spawnPower(){
+  if(Math.random()<.003){
+    const types=['9价','4价','13价'],t=types[Math.floor(Math.random()*3)];
+    GAME.powerUps.push({x:800,y:Math.random()*500,w:40,h:40,sp:3,t,txt:t});
+  }
+}
+
+// 更新
+function update(){
+  if(!GAME.running)return;
+  const now=Date.now();
+  // 能力过期
+  if(GAME.hero.power&&now-GAME.hero.powerT>5000){
+    if(GAME.hero.power==='13价'){GAME.hero.w=GAME.hero.w0;GAME.hero.h=GAME.hero.h0}
+    GAME.hero.power=null;document.getElementById('power').textContent='无';
+  }
+  // 移动
+  const h=GAME.hero;
+  if(touchDir===-1)h.x-=h.sp;
+  if(touchDir===1)h.x+=h.sp;
+  h.x=Math.max(0,Math.min(800-h.w,h.x));
+  // 重力
+  h.vy+=.8;h.y+=h.vy;h.onG=false;
+  // 平台
+  for(let p of GAME.plat){
+    if(h.x<p.x+p.w&&h.x+h.w>p.x&&h.y<p.y+p.h&&h.y+h.h>p.y&&h.vy>0){
+      h.y=p.y-h.h;h.vy=0;h.onG=true;
+    }
+  }
+  if(h.y>600){GAME.lives--;h.x=100;h.y=400;h.vy=0}
+  // 自动射击
+  shoot();
+  // 更新激光
+  GAME.lasers=GAME.lasers.filter(l=>{l.x+=l.sp;return l.x<800});
+  // 更新病毒
+  GAME.viruses.forEach(v=>{v.x-=v.sp;v.y+=v.dir*.5;if(v.y<=0||v.y>=560)v.dir*=-1});
+  // 更新奖励
+  GAME.powerUps.forEach(p=>{p.x-=p.sp;p.y+=Math.sin(now*.003)*2});
+  GAME.viruses=GAME.viruses.filter(v=>v.x>-40);
+  GAME.powerUps=GAME.powerUps.filter(p=>p.x>-40);
+  // 碰撞
+  GAME.lasers.forEach((l,li)=>{
+    GAME.viruses.forEach((v,vi)=>{
+      if(l.x<v.x+v.w&&l.x+l.w>v.x&&l.y<v.y+v.h&&l.y+l.h>v.y){
+        GAME.lasers.splice(li,1);GAME.viruses.splice(vi,1);GAME.score+=100;
+      }
+    });
+  });
+  GAME.viruses.forEach((v,vi)=>{
+    const h=GAME.hero;
+    if(h.x<v.x+v.w&&h.x+h.w>v.x&&h.y<v.y+v.h&&h.y+h.h>v.y){
+      if(h.power==='4价'&&now-h.powerT<5000){GAME.viruses.splice(vi,1);GAME.score+=50;return}
+      GAME.viruses.splice(vi,1);GAME.lives--;h.x=100;h.y=400;
+    }
+  });
+  GAME.powerUps.forEach((p,pi)=>{
+    const h=GAME.hero;
+    if(h.x<p.x+p.w&&h.x+h.w>p.x&&h.y<p.y+p.h&&h.y+h.h>p.y){
+      h.power=p.t;h.powerT=now;
+      if(p.t==='13价'){h.w=h.w0*1.5;h.h=h.h0*1.5}
+      document.getElementById('power').textContent=p.t;
+      GAME.powerUps.splice(pi,1);GAME.score+=200;
+    }
+  });
+  // 判定结束
+  if(GAME.lives<=0){GAME.running=false;document.getElementById('finalScore').textContent=GAME.score;document.getElementById('overPop').style.display='block'}
+  spawnVirus();spawnPower();
+  document.getElementById('score').textContent=GAME.score;document.getElementById('lives').textContent=GAME.lives;
+}
+
+// 渲染
+function draw(){
+  ctx.clearRect(0,0,800,600);
+  // 平台
+  ctx.fillStyle='#8B4513';GAME.plat.forEach(p=>ctx.fillRect(p.x,p.y,p.w,p.h));
+  // 英雄
+  const h=GAME.hero;ctx.drawImage(heroImg,h.x,h.y,h.w,h.h);
+  // 防护罩
+  const now=Date.now();
+  if(h.power==='4价'&&now-h.powerT<5000){ctx.strokeStyle='rgba(0,255,255,.6)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(h.x+h.w/2,h.y+h.h/2,Math.max(h.w,h.h)/2+10,0,Math.PI*2);ctx.stroke()}
+  // 病毒
+  GAME.viruses.forEach(v=>ctx.drawImage(virusImgs[v.t],v.x,v.y,v.w,v.h));
+  // 奖励包
+  GAME.powerUps.forEach(p=>{
+    ctx.fillStyle='#FFD700';ctx.fillRect(p.x,p.y,p.w,p.h);
+    ctx.strokeStyle='#FFA000';ctx.lineWidth=2;ctx.strokeRect(p.x,p.y,p.w,p.h);
+    ctx.fillStyle='#000';ctx.font='bold 16px Arial';ctx.textAlign='center';ctx.fillText(p.txt,p.x+p.w/2,p.y+p.h/2+5);
+  });
+  // 激光
+  ctx.fillStyle='#FFD700';ctx.shadowColor='#FFD700';ctx.shadowBlur=10;
+  GAME.lasers.forEach(l=>ctx.fillRect(l.x,l.y,l.w,l.h));
+  ctx.shadowBlur=0;
+}
+
+function loop(){update();draw();requestAnimationFrame(loop)}
+function restartGame(){
+  GAME={
+    hero:{x:100,y:400,w:50,h:50,vy:0,onG:false,sp:5,power:null,powerT:0,w0:50,h0:50},
+    viruses:[],lasers:[],powerUps:[],score:0,lives:3,running:true,
+    plat:[{x:0,y:550,w:800,h:50},{x:200,y:450,w:150,h:20},{x:400,y:350,w:150,h:20},{x:600,y:250,w:150,h:20}]
+  };
+  document.getElementById('overPop').style.display='none';document.getElementById('power').textContent='无';
+}
+loop();
+</script>
+</body>
+</html>
