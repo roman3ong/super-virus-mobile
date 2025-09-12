@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>超人打病毒 - 手机版</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+        body{font-family:Arial, sans-serif;background:linear-gradient(to bottom,#87CEEB,#98D8E8);overflow:hidden;touch-action:none}
+        #gameContainer{position:relative;width:100vw;height:100vh;background:linear-gradient(to bottom,#87CEEB,#E0F6FF);overflow:hidden}
+        #canvas{display:block;background:transparent;width:100%;height:100%}
+        .mobile-controls{position:absolute;bottom:20px;left:20px;display:flex;flex-direction:column;gap:10px;z-index:100}
+        .direction-controls{display:grid;grid-template-columns:repeat(3,60px);grid-template-rows:repeat(3,60px);gap:5px}
+        .control-btn{width:60px;height:60px;border:none;border-radius:50%;background:rgba(255,255,255,.8);color:#333;font-size:24px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 8px rgba(0,0,0,.2);transition:all .1s;touch-action:manipulation}
+        .control-btn:active{transform:scale(.95);background:rgba(255,255,255,.6)}
+        .control-btn.up{grid-column:2;grid-row:1}
+        .control-btn.left{grid-column:1;grid-row:2}
+        .control-btn.right{grid-column:3;grid-row:2}
+        .control-btn.down{grid-column:2;grid-row:3}
+        .fire-controls{position:absolute;bottom:20px;right:20px;z-index:100}
+        .fire-btn{width:80px;height:80px;border:none;border-radius:50%;background:rgba(255,0,0,.8);color:white;font-size:20px;font-weight:bold;cursor:pointer;box-shadow:0 4px 8px rgba(0,0,0,.3);transition:all .1s;touch-action:manipulation}
+        .fire-btn:active{transform:scale(.95);background:rgba(255,0,0,.6)}
+        .upload-section{position:absolute;top:10px;left:50%;transform:translateX(-50%);text-align:center;background:rgba(255,255,255,.9);padding:10px;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,.1);z-index:200;max-width:90%}
+        .upload-section h1{font-size:18px;margin-bottom:10px;color:#333}
+        .upload-controls{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+        .upload-btn{padding:8px 12px;background:#4CAF50;color:white;border:none;border-radius:5px;cursor:pointer;font-size:12px;transition:background .3s}
+        .upload-btn:hover{background:#45a049}
+        input[type=file]{display:none}
+        .score-board{position:absolute;top:10px;left:10px;color:#333;font-size:14px;font-weight:bold;background:rgba(255,255,255,.8);padding:8px;border-radius:5px;z-index:100}
+        .power-up-display{position:absolute;top:10px;right:10px;color:#333;font-size:12px;font-weight:bold;background:rgba(255,255,255,.8);padding:8px;border-radius:5px;z-index:100;max-width:120px}
+        .game-over{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,.95);padding:20px;border-radius:10px;text-align:center;display:none;box-shadow:0 4px 6px rgba(0,0,0,.3);z-index:300}
+        .restart-btn{padding:10px 20px;background:#FF6B6B;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;margin-top:10px}
+        .restart-btn:hover{background:#FF5252}
+        @media (max-width:480px){.upload-section h1{font-size:16px}.upload-btn{font-size:10px;padding:6px 8px}.control-btn{width:50px;height:50px;font-size:20px}.fire-btn{width:70px;height:70px;font-size:18px}}
+    </style>
+</head>
+<body>
+<div id="gameContainer">
+    <canvas id="canvas"></canvas>
+
+    <div class="upload-section">
+        <h1>🦸 超人打病毒 🦠</h1>
+        <div class="upload-controls">
+            <label for="heroUpload" class="upload-btn">超人</label>
+            <input type="file" id="heroUpload" accept="image/*">
+            <label for="virusUpload1" class="upload-btn">病毒1</label>
+            <input type="file" id="virusUpload1" accept="image/*">
+            <label for="virusUpload2" class="upload-btn">病毒2</label>
+            <input type="file" id="virusUpload2" accept="image/*">
+            <label for="virusUpload3" class="upload-btn">病毒3</label>
+            <input type="file" id="virusUpload3" accept="image/*">
+        </div>
+    </div>
+
+    <div class="score-board">
+        <div>得分: <span id="score">0</span></div>
+        <div>生命: <span id="lives">3</span></div>
+    </div>
+    <div class="power-up-display" id="powerUpDisplay">当前能力: 无</div>
+
+    <div class="mobile-controls">
+        <div class="direction-controls">
+            <button class="control-btn up" id="upBtn">↑</button>
+            <button class="control-btn left" id="leftBtn">←</button>
+            <button class="control-btn right" id="rightBtn">→</button>
+            <button class="control-btn down" id="downBtn">↓</button>
+        </div>
+    </div>
+
+    <div class="fire-controls">
+        <button class="fire-btn" id="fireBtn">发射</button>
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <h2>游戏结束！</h2>
+        <p>最终得分: <span id="finalScore">0</span></p>
+        <button class="restart-btn" onclick="restartGame()">重新开始</button>
+    </div>
+</div>
+
+<script>
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');
+function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight}
+resizeCanvas();window.addEventListener('resize',resizeCanvas);
+
+let heroImg=new Image(),virusImgs=[new Image(),new Image(),new Image()];
+heroImg.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyNSIgY3k9IjI1IiByPSIyMCIgZmlsbD0iIzQyODVGNCIvPjxzdmcgeD0iMTUiIHk9IjE1IiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyTDEzLjA5IDguMjZMMjAgOUwxMyA2TDEyIDIyTDEwIDEzTDMgOUwxMC44OCA4LjI2TDEyIDJaIi8+PC9zdmc+PC9zdmc+';
+const defaultVirusSvgs=[
+'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iI0ZGNTU1NSIvPjxzdmcgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNS4xIDQgMTYgNC45IDE2IDZDMTYuNyA2IDE3IDYuMyAxNyA3VjlMMTYuNSA5QzE2LjIgOSAxNiA5LjIgMTYgOS41QzE2IDkuOCAxNi4yIDEwIDE2LjUgMTBIMTcuNUwxOCAxMEgxOUMxOS41IDEwIDIwIDEwLjUgMjAgMTFWMTJIMTlMMTcgMTJWMTNDMTcgMTMuNiAxNi42IDE0IDE2IDE0SDE1VjE1TDE2IDE2VjE3TDE1IDE4VjE5TDEzIDE5VjE4TDEyIDE3VjE2SDExVjE0SDEwQzkuNCAxNCA5IDEzLjYgOSAxM1YxMkg3TDYgMTJWMTEgQzYgMTAuNSA2LjUgMTAgNyAxMEg4TDguNSAxMEg5LjVDOS44IDEwIDEwIDkuOCAxMCA5LjVDMTAgOS4yIDkuOCA5IDkuNSA5TDkgOUw5IDdDOS42IDcgMTAgNi43IDEwIDZDMTAgNC45IDEwLjkgNCAxMiA0QzEyIDIuOSAxMi45IDIgMTQgMk0xMyA2SDExVjExSDEzVjZaIi8+PC9zdmc+PC9zdmc+',
+'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzlDMjdCMCIvPjxzdmcgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNS4xIDQgMTYgNC45IDE2IDZDMTYuNyA2IDE3IDYuMyAxNyA3VjlMMTYuNSA5QzE2LjIgOSAxNiA5LjIgMTYgOS41QzE2IDkuOCAxNi4yIDEwIDE2LjUgMTBIMTcuNUwxOCAxMEgxOUMxOS41IDEwIDIwIDEwLjUgMjAgMTFWMTJIMTlMMTcgMTJWMTNDMTcgMTMuNiAxNi42IDE0IDE2IDE0SDE1VjE1TDE2IDE2VjE3TDE1IDE4VjE5TDEzIDE5VjE4TDEyIDE3VjE2SDExVjE0SDEwQzkuNCAxNCA5IDEzLjYgOSAxM1YxMkg3TDYgMTJWMTEgQzYgMTAuNSA2LjUgMTAgNyAxMEg4TDguNSAxMEg5LjVDOS44IDEwIDEwIDkuOCAxMCA5LjVDMTAgOS4yIDkuOCA5IDkuNSA5TDkgOUw5IDdDOS42IDcgMTAgNi43IDEwIDZDMTAgNC45IDEwLjkgNCAxMiA0QzEyIDIuOSAxMi45IDIgMTQgMk0xMyA2SDExVjExSDEzVjZaIi8+PC9zdmc+PC9zdmc+',
+'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSIxOCIgZmlsbD0iIzRDQUY1MCIvPjxzdmcgeD0iMTAiIHk9IjEwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNS4xIDQgMTYgNC45IDE2IDZDMTYuNyA2IDE3IDYuMyAxNyA3VjlMMTYuNSA5QzE2LjIgOSAxNiA5LjIgMTYgOS41QzE2IDkuOCAxNi4yIDEwIDE2LjUgMTBIMTcuNUwxOCAxMEgxOUMxOS41IDEwIDIwIDEwLjUgMjAgMTFWMTJIMTlMMTcgMTJWMTNDMTcgMTMuNiAxNi42IDE0IDE2IDE0SDE1VjE1TDE2IDE2VjE3TDE1IDE4VjE5TDEzIDE5VjE4TDEyIDE3VjE2SDExVjE0SDEwQzkuNCAxNCA5IDEzLjYgOSAxM1YxMkg3TDYgMTJWMTEgQzYgMTAuNSA2LjUgMTAgNyAxMEg4TDguNSAxMEg5LjVDOS44IDEwIDEwIDkuOCAxMCA5LjVDMTAgOS4yIDkuOCA5IDkuNSA5TDkgOUw5IDdDOS42IDcgMTAgNi43IDEwIDZDMTAgNC45IDEwLjkgNCAxMiA0QzEyIDIuOSAxMi45IDIgMTQgMk0xMyA2SDExVjExSDEzVjZaIi8+PC9zdmc+PC9zdmc+'
+];virusImgs.forEach((img,i)=>img.src=defaultVirusSvgs[i]);
+
+let gameState={
+    hero:{x:100,y:400,width:50,height:50,velocityY:0,isJumping:false,speed:5,powerUp:null,powerUpTime:0,originalSize:{width:50,height:50}},
+    viruses:[],lasers:[],powerUps:[],score:0,lives:3,gameRunning:true,keys:{},platforms:[]
+};
+
+function adjustPlatforms(){
+    const W=canvas.width,H=canvas.height;
+    gameState.platforms=[
+        {x:0,y:H-50,width:W,height:50},
+        {x:W*.25,y:H*.75,width:150,height:20},
+        {x:W*.5,y:H*.6,width:150,height:20},
+        {x:W*.75,y:H*.45,width:150,height:20}
+    ];
+    if(gameState.hero.x>W){gameState.hero.x=100;gameState.hero.y=H-100;}
+}
+adjustPlatforms();window.addEventListener('resize',adjustPlatforms);
+
+['heroUpload',...Array(3).keys().map(i=>`virusUpload${i+1}`)].forEach((id,i)=>{
+    document.getElementById(id).addEventListener('change',function(e){
+        const file=e.target.files[0];
+        if(file){
+            const reader=new FileReader();
+            reader.onload=evt=>(i?virusImgs[i-1]:heroImg).src=evt.target.result;
+            reader.readAsDataURL(file);
+        }
+    });
+});
+
+const touchControls={left:false,right:false,up:false,down:false};
+['left','right','up','down'].forEach(d=>{
+    const btn=document.getElementById(d+'Btn');
+    btn.addEventListener('touchstart',e=>{e.preventDefault();touchControls[d]=true});
+    btn.addEventListener('touchend',e=>{e.preventDefault();touchControls[d]=false});
+});
+document.getElementById('fireBtn').addEventListener('touchstart',e=>{e.preventDefault();if(gameState.gameRunning)shootLaser()});
+
+document.addEventListener('keydown',e=>{
+    gameState.keys[e.key]=true;
+    if(e.key===' '&&gameState.gameRunning){shootLaser();e.preventDefault()}
+});
+document.addEventListener('keyup',e=>gameState.keys[e.key]=false);
+
+function shootLaser(){
+    const now=Date.now();
+    if(gameState.hero.powerUp==='13价'&&now-gameState.hero.powerUpTime<5000){
+        //6方向激光
+        const cx=gameState.hero.x+gameState.hero.width/2;
+        const cy=gameState.hero.y+gameState.hero.height/2;
+        for(let ang=-Math.PI;ang<Math.PI;ang+=Math.PI/3){
+            gameState.lasers.push({x:cx,y:cy,width:30,height:5,speed:10,angle:ang});
+        }
+        return;
+    }
+    if(gameState.hero.powerUp==='9价'&&now-gameState.hero.powerUpTime<5000){
+        //三束
+        gameState.lasers.push(
+            {x:gameState.hero.x+gameState.hero.width,y:gameState.hero.y+gameState.hero.height/2-20,width:30,height:5,speed:10},
+            {x:gameState.hero.x+gameState.hero.width,y:gameState.hero.y+gameState.hero.height/2,width:30,height:5,speed:10},
+            {x:gameState.hero.x+gameState.hero.width,y:gameState.hero.y+gameState.hero.height/2+20,width:30,height:5,speed:10}
+        );
+        return;
+    }
+    //单束
+    gameState.lasers.push({x:gameState.hero.x+gameState.hero.width,y:gameState.hero.y+gameState.hero.height/2,width:30,height:5,speed:10});
+}
+
+function spawnVirus(){
+    if(Math.random()<.02&&gameState.viruses.length<8){
+        const type=Math.floor(Math.random()*3);
+        gameState.viruses.push({
+            x:canvas.width,
+            y:Math.random()*(canvas.height-100),
+            width:40,height:40,
+            speed:1+Math.random()*1.2,   //变慢
+            direction:Math.random()>.5?1:-1,
+            type
+        });
+    }
+}
+function spawnPowerUp(){
+    if(Math.random()<.005){
+        const types=['9价','4价','13价'];
+        const type=types[Math.floor(Math.random()*types.length)];
+        gameState.powerUps.push({x:canvas.width,y:Math.random()*(canvas.height-100),width:40,height:40,speed:3,type,text:type});
+    }
+}
+
+function update(){
+    if(!gameState.gameRunning)return;
+    const now=Date.now();
+    if(gameState.hero.powerUp&&now-gameState.hero.powerUpTime>5000){
+        gameState.hero.powerUp=null;
+        document.getElementById('powerUpDisplay').textContent='当前能力: 无';
+    }
+
+    //移动
+    if(gameState.keys['ArrowLeft']||touchControls.left)gameState.hero.x-=gameState.hero.speed;
+    if(gameState.keys['ArrowRight']||touchControls.right)gameState.hero.x+=gameState.hero.speed;
+    if((gameState.keys['ArrowUp']||touchControls.up)&&!gameState.hero.isJumping){
+        gameState.hero.velocityY=-15;
+        gameState.hero.isJumping=true;
+    }
+    if(gameState.keys['ArrowDown']||touchControls.down)gameState.hero.y+=gameState.hero.speed;
+    if(gameState.hero.x<0)gameState.hero.x=0;
+    if(gameState.hero.x>canvas.width-gameState.hero.width)gameState.hero.x=canvas.width-gameState.hero.width;
+
+    //重力
+    gameState.hero.velocityY+=.8;
+    gameState.hero.y+=gameState.hero.velocityY;
+    gameState.hero.isJumping=true;
+    for(const p of gameState.platforms){
+        if(gameState.hero.x<p.x+p.width&&gameState.hero.x+gameState.hero.width>p.x&&gameState.hero.y<p.y+p.height&&gameState.hero.y+gameState.hero.height>p.y&&gameState.hero.velocityY>0){
+            gameState.hero.y=p.y-gameState.hero.height;
+            gameState.hero.velocityY=0;
+            gameState.hero.isJumping=false;
+        }
+    }
+    if(gameState.hero.y>canvas.height){
+        gameState.lives--;
+        gameState.hero.x=100;
+        gameState.hero.y=canvas.height-100;
+        gameState.hero.velocityY=0;
+    }
+
+    //更新激光
+    gameState.lasers=gameState.lasers.filter(l=>{
+        if(l.angle!=null){
+            l.x+=Math.cos(l.angle)*l.speed;
+            l.y+=Math.sin(l.angle)*l.speed;
+        }else l.x+=l.speed;
+        return l.x>-20&&l.x<canvas.width+20&&l.y>-20&&l.y<canvas.height+20;
+    });
+
+    //更新病毒（Y方向速度减半，整体更慢）
+    gameState.viruses.forEach(v=>{
+        v.x-=v.speed;
+        v.y+=v.direction*.25;
+        if(v.y<=0||v.y>=canvas.height-v.height)v.direction*=-1;
+    });
+    gameState.powerUps.forEach(p=>{
+        p.x-=p.speed;
+        p.y+=Math.sin(Date.now()*.003)*2;
+    });
+
+    gameState.viruses=gameState.viruses.filter(v=>v.x>-v.width);
+    gameState.powerUps=gameState.powerUps.filter(p=>p.x>-p.width);
+
+    //碰撞检测
+    gameState.lasers.forEach((l,li)=>{
+        gameState.viruses.forEach((v,vi)=>{
+            if(l.x<v.x+v.width&&l.x+l.width>v.x&&l.y<v.y+v.height&&l.y+l.height>v.y){
+                gameState.lasers.splice(li,1);
+                gameState.viruses.splice(vi,1);
+                gameState.score+=100;
+            }
+        });
+    });
+    gameState.viruses.forEach((v,vi)=>{
+        if(gameState.hero.x<v.x+v.width&&gameState.hero.x+gameState.hero.width>v.x&&gameState.hero.y<v.y+v.height&&gameState.hero.y+gameState.hero.height>v.y){
+            const now=Date.now();
+            if(gameState.hero.powerUp==='4价'&&now-gameState.hero.powerUpTime<5000){
+                gameState.viruses.splice(vi,1);
+                gameState.score+=50;
+            }else{
+                gameState.viruses.splice(vi,1);
+                gameState.lives--;
+                gameState.hero.x=100;
+                gameState.hero.y=canvas.height-100;
+            }
+        }
+    });
+    gameState.powerUps.forEach((p,i)=>{
+        if(gameState.hero.x<p.x+p.width&&gameState.hero.x+gameState.hero.width>p.x&&gameState.hero.y<p.y+p.height&&gameState.hero.y+gameState.hero.height>p.y){
+            gameState.hero.powerUp=p.type;
+            gameState.hero.powerUpTime=Date.now();
+            document.getElementById('powerUpDisplay').textContent=`当前能力: ${p.type}`;
+            gameState.powerUps.splice(i,1);
+            gameState.score+=200;
+        }
+    });
+
+    if(gameState.lives<=0)gameOver();
+    spawnVirus();spawnPowerUp();
+    document.getElementById('score').textContent=gameState.score;
+    document.getElementById('lives').textContent=gameState.lives;
+}
+
+function render(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#8B4513';
+    gameState.platforms.forEach(p=>ctx.fillRect(p.x,p.y,p.width,p.height));
+    ctx.drawImage(heroImg,gameState.hero.x,gameState.hero.y,gameState.hero.width,gameState.hero.height);
+    const now=Date.now();
+    if(gameState.hero.powerUp==='4价'&&now-gameState.hero.powerUpTime<5000){
+        ctx.strokeStyle='rgba(0,255,255,.6)';ctx.lineWidth=3;
+        ctx.beginPath();
+        ctx.arc(gameState.hero.x+gameState.hero.width/2,gameState.hero.y+gameState.hero.height/2,Math.max(gameState.hero.width,gameState.hero.height)/2+10,0,Math.PI*2);
+        ctx.stroke();
+    }
+    gameState.viruses.forEach(v=>ctx.drawImage(virusImgs[v.type],v.x,v.y,v.width,v.height));
+    gameState.powerUps.forEach(p=>{
+        ctx.fillStyle='#FFD700';ctx.fillRect(p.x,p.y,p.width,p.height);
+        ctx.strokeStyle='#FFA000';ctx.lineWidth=2;ctx.strokeRect(p.x,p.y,p.width,p.height);
+        ctx.fillStyle='#000';ctx.font='bold 16px Arial';ctx.textAlign='center';ctx.fillText(p.text,p.x+p.width/2,p.y+p.height/2+5);
+    });
+    ctx.fillStyle='#FFD700';
+    gameState.lasers.forEach(l=>{
+        ctx.save();
+        if(l.angle!=null){ctx.translate(l.x,l.y);ctx.rotate(l.angle);ctx.fillRect(-l.width/2,-l.height/2,l.width,l.height);}
+        else ctx.fillRect(l.x,l.y,l.width,l.height);
+        ctx.restore();
+    });
+}
+
+function gameOver(){
+    gameState.gameRunning=false;
+    document.getElementById('finalScore').textContent=gameState.score;
+    document.getElementById('gameOver').style.display='block';
+}
+function restartGame(){
+    gameState={
+        hero:{x:100,y:canvas.height-100,width:50,height:50,velocityY:0,isJumping:false,speed:5,powerUp:null,powerUpTime:0,originalSize:{width:50,height:50}},
+        viruses:[],lasers:[],powerUps:[],score:0,lives:3,gameRunning:true,keys:{},platforms:[]
+    };
+    adjustPlatforms();
+    Object.keys(touchControls).forEach(k=>touchControls[k]=false);
+    document.getElementById('gameOver').style.display='none';
+    document.getElementById('powerUpDisplay').textContent='当前能力: 无';
+}
+
+(function gameLoop(){update();render();requestAnimationFrame(gameLoop)})();
+</script>
+</body>
+</html>
