@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>超人打病毒 - 手机版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #87CEEB, #98D8E8);
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87CEEB, #E0F6FF);
+            overflow: hidden;
+        }
+
+        #canvas {
+            display: block;
+            background: transparent;
+            width: 100%;
+            height: 100%;
+        }
+
+        .mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .direction-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.8);
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.1s;
+            touch-action: manipulation;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .control-btn.up { grid-column: 2; grid-row: 1; }
+        .control-btn.left { grid-column: 1; grid-row: 2; }
+        .control-btn.right { grid-column: 3; grid-row: 2; }
+        .control-btn.down { grid-column: 2; grid-row: 3; }
+
+        .fire-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .fire-btn {
+            width: 80px;
+            height: 80px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.1s;
+            touch-action: manipulation;
+        }
+
+        .fire-btn:active {
+            transform: scale(0.95);
+            background: rgba(255, 0, 0, 0.6);
+        }
+
+        .upload-section {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 200;
+            max-width: 90%;
+        }
+
+        .upload-section h1 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .upload-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            justify-content: center;
+        }
+
+        .upload-btn {
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .upload-btn:hover {
+            background: #45a049;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .score-board {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #333;
+            font-size: 14px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+
+        .power-up-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #333;
+            font-size: 12px;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px;
+            border-radius: 5px;
+            z-index: 100;
+            max-width: 120px;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            z-index: 300;
+        }
+
+        .restart-btn {
+            padding: 10px 20px;
+            background: #FF6B6B;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        .restart-btn:hover {
+            background: #FF5252;
+        }
+
+        .jump-btn {
+            width: 60px;
+            height: 60px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(0, 123, 255, 0.8);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.1s;
+            touch-action: manipulation;
+        }
+
+        .jump-btn:active {
+            transform: scale(0.95);
+            background: rgba(0, 123, 255, 0.6);
+        }
+
+        @media (max-width: 480px) {
+            .upload-section h1 {
+                font-size: 16px;
+            }
+            
+            .upload-btn {
+                font-size: 10px;
+                padding: 6px 8px;
+            }
+            
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            
+            .fire-btn {
+                width: 70px;
+                height: 70px;
+                font-size: 18px;
+            }
+            
+            .jump-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="canvas"></canvas>
+        
+        <div class="upload-section">
+            <h1>🦸 超人打病毒 🦠</h1>
+            <div class="upload-controls">
+                <label for="heroUpload" class="upload-btn">超人</label>
+                <input type="file" id="heroUpload" accept="image/*">
+                
+                <label for="virusUpload1" class="upload-btn">病毒1</label>
+                <input type="file" id="virusUpload1" accept="image/*">
+                
+                <label for="virusUpload2" class="upload-btn">病毒2</label>
+                <input type="file" id="virusUpload2" accept="image/*">
+                
+                <label for="virusUpload3" class="upload-btn">病毒3</label>
+                <input type="file" id="virusUpload3" accept="image/*">
+            </div>
+        </div>
+
+        <div class="score-board">
+            <div>得分: <span id="score">0</span></div>
+            <div>生命: <span id="lives">3</span></div>
+        </div>
+        
+        <div class="power-up-display" id="powerUpDisplay">
+            当前能力: 无
+        </div>
+
+        <div class="mobile-controls">
+            <div class="direction-controls">
+                <button class="control-btn up" id="upBtn">↑</button>
+                <button class="control-btn left" id="leftBtn">←</button>
+                <button class="control-btn right" id="rightBtn">→</button>
+                <button class="control-btn down" id="downBtn">↓</button>
+            </div>
+            <button class="jump-btn" id="jumpBtn">跳跃</button>
+        </div>
+
+        <div class="fire-controls">
+            <button class="fire-btn" id="fireBtn">发射</button>
+        </div>
+
+        <div class="game-over" id="gameOver">
+            <h2>游戏结束！</h2>
+            <p>最终得分: <span id="finalScore">0</span></p>
+            <button class="restart-btn" onclick="restartGame()">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置canvas尺寸
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        let heroImg = new Image();
+        let virusImgs = [new Image(), new Image(), new Image()];
+        
+        // 默认图片
+        heroImg.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjUiIGN5PSIyNSIgcj0iMjAiIGZpbGw9IiM0Mjg1RjQiLz4KPHN2ZyB4PSIxNSIgeT0iMTUiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+CjxwYXRoIGQ9Ik0xMiAyTDEzLjA5IDguMjZMMjAgOUwxMyA2TDEyIDIyTDEwIDEzTDMgOUwxMC44OCA4LjI2TDEyIDJaIi8+Cjwvc3ZnPgo8L3N2Zz4=';
+        
+        const defaultVirusSvgs = [
+            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiNGRjU1NTUiLz4KPHN2ZyB4PSIxMCIgeT0iMTAiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+CjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNS4xIDQgMTYgNC45IDE2IDZDMTYuNyA2IDE3IDYuMyAxNyA3VjlMMTYuNSA5QzE2LjIgOSAxNiA5LjIgMTYgOS41QzE2IDkuOCAxNi4yIDEwIDE2LjUgMTBIMTcuNUwxOCAxMEgxOUMxOS41IDEwIDIwIDEwLjUgMjAgMTFWMTJIMTlMMTcgMTJWMTNDMTcgMTMuNiAxNi42IDE0IDE2IDE0SDE1VjE1TDE2IDE2VjE3TDE1IDE4VjE5TDEzIDE5VjE4TDEyIDE3VjE2SDExVjE0SDEwQzkuNCAxNCA5IDEzLjYgOSAxM1YxMkg3TDYgMTJWMTEgQzYgMTAuNSA2LjUgMTAgNyAxMEg4TDguNSAxMEg5LjVDOS44IDEwIDEwIDkuOCAxMCA5LjVDMTAgOS4yIDkuOCA5IDkuNSA5TDkgOUw5IDdDOS42IDcgMTAgNi43IDEwIDZDMTAgNC45IDEwLjkgNCAxMiA0QzEyIDIuOSAxMi45IDIgMTQgMk0xMyA2SDExVjExSDEzVjZaIi8+Cjwvc3ZnPgo8L3N2Zz4=',
+            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiM5QzI3QjAiLz4KPHN2ZyB4PSIxMCIgeT0iMTAiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+CjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNS4xIDQgMTYgNC45IDE2IDZDMTYuNyA2IDE3IDYuMyAxNyA3VjlMMTYuNSA5QzE2LjIgOSAxNiA5LjIgMTYgOS41QzE2IDkuOCAxNi4yIDEwIDE2LjUgMTBIMTcuNUwxOCAxMEgxOUMxOS41IDEwIDIwIDEwLjUgMjAgMTFWMTJIMTlMMTcgMTJWMTNDMTcgMTMuNiAxNi42IDE0IDE2IDE0SDE1VjE1TDE2IDE2VjE3TDE1IDE4VjE5TDEzIDE5VjE4TDEyIDE3VjE2SDExVjE0SDEwQzkuNCAxNCA5IDEzLjYgOSAxM1YxMkg3TDYgMTJWMTEgQzYgMTAuNSA2LjUgMTAgNyAxMEg4TDguNSAxMEg5LjVDOS44IDEwIDEwIDkuOCAxMCA5LjVDMTAgOS4yIDkuOCA5IDkuNSA5TDkgOUw5IDdDOS42IDcgMTAgNi43IDEwIDZDMTAgNC45IDEwLjkgNCAxMiA0QzEyIDIuOSAxMi45IDIgMTQgMk0xMyA2SDExVjExSDEzVjZaIi8+Cjwvc3ZnPgo8L3N2Zz4=',
+            'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTgiIGZpbGw9IiM0Q0FGNTAiLz4KPHN2ZyB4PSIxMCIgeT0iMTAiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJ3aGl0ZSI+CjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNS4xIDQgMTYgNC45IDE2IDZDMTYuNyA2IDE3IDYuMyAxNyA3VjlMMTYuNSA5QzE2LjIgOSAxNiA5LjIgMTYgOS41QzE2IDkuOCAxNi4yIDEwIDE2LjUgMTBIMTcuNUwxOCAxMEgxOUMxOS41IDEwIDIwIDEwLjUgMjAgMTFWMTJIMTlMMTcgMTJWMTNDMTcgMTMuNiAxNi42IDE0IDE2IDE0SDE1VjE1TDE2IDE2VjE3TDE1IDE4VjE5TDEzIDE5VjE4TDEyIDE3VjE2SDExVjE0SDEwQzkuNCAxNCA5IDEzLjYgOSAxM1YxMkg3TDYgMTJWMTEgQzYgMTAuNSA2LjUgMTAgNyAxMEg4TDguNSAxMEg5LjVDOS44IDEwIDEwIDkuOCAxMCA5LjVDMTAgOS4yIDkuOCA5IDkuNSA5TDkgOUw5IDdDOS42IDcgMTAgNi43IDEwIDZDMTAgNC45IDEwLjkgNCAxMiA0QzEyIDIuOSAxMi45IDIgMTQgMk0xMyA2SDExVjExSDEzVjZaIi8+Cjwvc3ZnPgo8L3N2Zz4='
+        ];
+
+        virusImgs[0].src = defaultVirusSvgs[0];
+        virusImgs[1].src = defaultVirusSvgs[1];
+        virusImgs[2].src = defaultVirusSvgs[2];
+
+        let gameState = {
+            hero: {
+                x: 100,
+                y: 400,
+                width: 50,
+                height: 50,
+                velocityY: 0,
+                isJumping: false,
+                speed: 5,
+                powerUp: null,
+                powerUpTime: 0,
+                originalSize: {width: 50, height: 50}
+            },
+            viruses: [],
+            lasers: [],
+            powerUps: [],
+            score: 0,
+            lives: 3,
+            gameRunning: true,
+            keys: {},
+            platforms: []
+        };
+
+        // 根据屏幕尺寸调整平台位置
+        function adjustPlatforms() {
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            gameState.platforms = [
+                {x: 0, y: screenHeight - 50, width: screenWidth, height: 50},
+                {x: screenWidth * 0.25, y: screenHeight * 0.75, width: 150, height: 20},
+                {x: screenWidth * 0.5, y: screenHeight * 0.6, width: 150, height: 20},
+                {x: screenWidth * 0.75, y: screenHeight * 0.45, width: 150, height: 20}
+            ];
+            
+            // 调整英雄初始位置
+            if (gameState.hero.x > screenWidth) {
+                gameState.hero.x = 100;
+                gameState.hero.y = screenHeight - 100;
+            }
+        }
+
+        // 图片上传处理
+        document.getElementById('heroUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    heroImg.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        for (let i = 0; i < 3; i++) {
+            document.getElementById(`virusUpload${i + 1}`).addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        virusImgs[i].src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // 移动端控制
+        let touchControls = {
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+            fire: false
+        };
+
+        // 方向键控制
+        document.getElementById('leftBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.left = true;
+        });
+        document.getElementById('leftBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.left = false;
+        });
+
+        document.getElementById('rightBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.right = true;
+        });
+        document.getElementById('rightBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.right = false;
+        });
+
+        document.getElementById('upBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.up = true;
+        });
+        document.getElementById('upBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.up = false;
+        });
+
+        document.getElementById('downBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchControls.down = true;
+        });
+        document.getElementById('downBtn').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchControls.down = false;
+        });
+
+        // 跳跃按钮
+        document.getElementById('jumpBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameState.hero.isJumping) {
+                gameState.hero.velocityY = -15;
+                gameState.hero.isJumping = true;
+            }
+        });
+
+        // 发射按钮
+        document.getElementById('fireBtn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameState.gameRunning) {
+                shootLaser();
+            }
+        });
+
+        // 键盘事件（保留PC端支持）
+        document.addEventListener('keydown', (e) => {
+            gameState.keys[e.key] = true;
+            if (e.key === ' ' && gameState.gameRunning) {
+                shootLaser();
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            gameState.keys[e.key] = false;
+        });
+
+        // 发射激光
+        function shootLaser() {
+            const now = Date.now();
+            if (gameState.hero.powerUp === '9价' && now - gameState.hero.powerUpTime < 5000) {
+                gameState.lasers.push({
+                    x: gameState.hero.x + gameState.hero.width,
+                    y: gameState.hero.y + gameState.hero.height / 2 - 20,
+                    width: 30,
+                    height: 5,
+                    speed: 10
+                });
+                gameState.lasers.push({
+                    x: gameState.hero.x + gameState.hero.width,
+                    y: gameState.hero.y + gameState.hero.height / 2,
+                    width: 30,
+                    height: 5,
+                    speed: 10
+                });
+                gameState.lasers.push({
+                    x: gameState.hero.x + gameState.hero.width,
+                    y: gameState.hero.y + gameState.hero.height / 2 + 20,
+                    width: 30,
+                    height: 5,
+                    speed: 10
+                });
+            } else {
+                gameState.lasers.push({
+                    x: gameState.hero.x + gameState.hero.width,
+                    y: gameState.hero.y + gameState.hero.height / 2,
+                    width: 30,
+                    height: 5,
+                    speed: 10
+                });
+            }
+        }
+
+        // 生成病毒
+        function spawnVirus() {
+            if (Math.random() < 0.02 && gameState.viruses.length < 8) {
+                const type = Math.floor(Math.random() * 3);
+                gameState.viruses.push({
+                    x: canvas.width,
+                    y: Math.random() * (canvas.height - 100),
+                    width: 40,
+                    height: 40,
+                    speed: 2 + Math.random() * 2,
+                    direction: Math.random() > 0.5 ? 1 : -1,
+                    type: type
+                });
+            }
+        }
+
+        // 生成奖励包
+        function spawnPowerUp() {
+            if (Math.random() < 0.005) {
+                const types = ['9价', '4价', '13价'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                gameState.powerUps.push({
+                    x: canvas.width,
+                    y: Math.random() * (canvas.height - 100),
+                    width: 40,
+                    height: 40,
+                    speed: 3,
+                    type: type,
+                    text: type
+                });
+            }
+        }
+
+        // 更新游戏状态
+        function update() {
+            if (!gameState.gameRunning) return;
+
+            const now = Date.now();
+            if (gameState.hero.powerUp && now - gameState.hero.powerUpTime > 5000) {
+                if (gameState.hero.powerUp === '13价') {
+                    gameState.hero.width = gameState.hero.originalSize.width;
+                    gameState.hero.height = gameState.hero.originalSize.height;
+                }
+                gameState.hero.powerUp = null;
+                document.getElementById('powerUpDisplay').textContent = '当前能力: 无';
+            }
+
+            // 英雄移动 - 结合键盘和触屏控制
+            if (gameState.keys['ArrowLeft'] || touchControls.left) {
+                gameState.hero.x -= gameState.hero.speed;
+            }
+            if (gameState.keys['ArrowRight'] || touchControls.right) {
+                gameState.hero.x += gameState.hero.speed;
+            }
+            if ((gameState.keys['ArrowUp'] || touchControls.up) && !gameState.hero.isJumping) {
+                gameState.hero.velocityY = -15;
+                gameState.hero.isJumping = true;
+            }
+            if (gameState.keys['ArrowDown'] || touchControls.down) {
+                gameState.hero.y += gameState.hero.speed;
+            }
+
+            // 边界检测
+            if (gameState.hero.x < 0) gameState.hero.x = 0;
+            if (gameState.hero.x > canvas.width - gameState.hero.width) {
+                gameState.hero.x = canvas.width - gameState.hero.width;
+            }
+
+            // 重力
+            gameState.hero.velocityY += 0.8;
+            gameState.hero.y += gameState.hero.velocityY;
+
+            // 平台碰撞检测
+            gameState.hero.isJumping = true;
+            for (let platform of gameState.platforms) {
+                if (gameState.hero.x < platform.x + platform.width &&
+                    gameState.hero.x + gameState.hero.width > platform.x &&
+                    gameState.hero.y < platform.y + platform.height &&
+                    gameState.hero.y + gameState.hero.height > platform.y) {
+                    
+                    if (gameState.hero.velocityY > 0) {
+                        gameState.hero.y = platform.y - gameState.hero.height;
+                        gameState.hero.velocityY = 0;
+                        gameState.hero.isJumping = false;
+                    }
+                }
+            }
+
+            // 边界检测
+            if (gameState.hero.y > canvas.height) {
+                gameState.lives--;
+                gameState.hero.x = 100;
+                gameState.hero.y = canvas.height - 100;
+                gameState.hero.velocityY = 0;
+            }
+
+            // 更新激光
+            gameState.lasers = gameState.lasers.filter(laser => {
+                laser.x += laser.speed;
+                return laser.x < canvas.width;
+            });
+
+            // 更新病毒
+            gameState.viruses.forEach(virus => {
+                virus.x -= virus.speed;
+                virus.y += virus.direction * 0.5;
+                
+                if (virus.y <= 0 || virus.y >= canvas.height - virus.height) {
+                    virus.direction *= -1;
+                }
+            });
+
+            // 更新奖励包
+            gameState.powerUps.forEach(powerUp => {
+                powerUp.x -= powerUp.speed;
+                powerUp.y += Math.sin(Date.now() * 0.003) * 2;
+            });
+
+            // 移除超出屏幕的物品
+            gameState.viruses = gameState.viruses.filter(virus => virus.x > -virus.width);
+            gameState.powerUps = gameState.powerUps.filter(powerUp => powerUp.x > -powerUp.width);
+
+            // 碰撞检测 - 激光与病毒
+            gameState.lasers.forEach((laser, laserIndex) => {
+                gameState.viruses.forEach((virus, virusIndex) => {
+                    if (laser.x < virus.x + virus.width &&
+                        laser.x + laser.width > virus.x &&
+                        laser.y < virus.y + virus.height &&
+                        laser.y + laser.height > virus.y) {
+                        
+                        gameState.lasers.splice(laserIndex, 1);
+                        gameState.viruses.splice(virusIndex, 1);
+                        gameState.score += 100;
+                    }
+                });
+            });
+
+            // 碰撞检测 - 英雄与病毒
+            gameState.viruses.forEach((virus, index) => {
+                if (gameState.hero.x < virus.x + virus.width &&
+                    gameState.hero.x + gameState.hero.width > virus.x &&
+                    gameState.hero.y < virus.y + virus.height &&
+                    gameState.hero.y + gameState.hero.height > virus.y) {
+                    
+                    const now = Date.now();
+                    if (gameState.hero.powerUp === '4价' && now - gameState.hero.powerUpTime < 5000) {
+                        gameState.viruses.splice(index, 1);
+                        gameState.score += 50;
+                    } else {
+                        gameState.viruses.splice(index, 1);
+                        gameState.lives--;
+                        gameState.hero.x = 100;
+                        gameState.hero.y = canvas.height - 100;
+                    }
+                }
+            });
+
+            // 碰撞检测 - 英雄与奖励包
+            gameState.powerUps.forEach((powerUp, index) => {
+                if (gameState.hero.x < powerUp.x + powerUp.width &&
+                    gameState.hero.x + gameState.hero.width > powerUp.x &&
+                    gameState.hero.y < powerUp.y + powerUp.height &&
+                    gameState.hero.y + gameState.hero.height > powerUp.y) {
+                    
+                    gameState.hero.powerUp = powerUp.type;
+                    gameState.hero.powerUpTime = Date.now();
+                    
+                    if (powerUp.type === '13价') {
+                        gameState.hero.width = gameState.hero.originalSize.width * 1.5;
+                        gameState.hero.height = gameState.hero.originalSize.height * 1.5;
+                    }
+                    
+                    document.getElementById('powerUpDisplay').textContent = `当前能力: ${powerUp.type}`;
+                    gameState.powerUps.splice(index, 1);
+                    gameState.score += 200;
+                }
+            });
+
+            if (gameState.lives <= 0) {
+                gameOver();
+            }
+
+            spawnVirus();
+            spawnPowerUp();
+
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('lives').textContent = gameState.lives;
+        }
+
+        // 渲染游戏
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制平台
+            ctx.fillStyle = '#8B4513';
+            gameState.platforms.forEach(platform => {
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            });
+
+            // 绘制英雄
+            ctx.drawImage(heroImg, gameState.hero.x, gameState.hero.y, gameState.hero.width, gameState.hero.height);
+            
+            const now = Date.now();
+            if (gameState.hero.powerUp === '4价' && now - gameState.hero.powerUpTime < 5000) {
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(gameState.hero.x + gameState.hero.width/2, gameState.hero.y + gameState.hero.height/2, 
+                       Math.max(gameState.hero.width, gameState.hero.height)/2 + 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // 绘制病毒
+            gameState.viruses.forEach(virus => {
+                ctx.drawImage(virusImgs[virus.type], virus.x, virus.y, virus.width, virus.height);
+            });
+
+            // 绘制奖励包
+            gameState.powerUps.forEach(powerUp => {
+                ctx.fillStyle = '#FFD700';
+                ctx.fillRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
+                
+                ctx.strokeStyle = '#FFA000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(powerUp.x, powerUp.y, powerUp.width, powerUp.height);
+                
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(powerUp.text, powerUp.x + powerUp.width/2, powerUp.y + powerUp.height/2 + 5);
+            });
+
+            // 绘制激光
+            ctx.fillStyle = '#FFD700';
+            gameState.lasers.forEach(laser => {
+                ctx.fillRect(laser.x, laser.y, laser.width, laser.height);
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 10;
+                ctx.fillRect(laser.x, laser.y, laser.width, laser.height);
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function gameOver() {
+            gameState.gameRunning = false;
+            document.getElementById('finalScore').textContent = gameState.score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        function restartGame() {
+            gameState = {
+                hero: {
+                    x: 100,
+                    y: canvas.height - 100,
+                    width: 50,
+                    height: 50,
+                    velocityY: 0,
+                    isJumping: false,
+                    speed: 5,
+                    powerUp: null,
+                    powerUpTime: 0,
+                    originalSize: {width: 50, height: 50}
+                },
+                viruses: [],
+                lasers: [],
+                powerUps: [],
+                score: 0,
+                lives: 3,
+                gameRunning: true,
+                keys: {},
+                platforms: []
+            };
+            
+            adjustPlatforms();
+            touchControls = {
+                left: false,
+                right: false,
+                up: false,
+                down: false,
+                fire: false
+            };
+            
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('powerUpDisplay').textContent = '当前能力: 无';
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 初始化
+        adjustPlatforms();
+        gameLoop();
+    </script>
+</body>
+</html>
